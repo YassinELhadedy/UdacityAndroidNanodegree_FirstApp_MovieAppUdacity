@@ -125,6 +125,7 @@
 
                 </FrameLayout>
             </LinearLayout>
+
         </FrameLayout>
     </RelativeLayout>
 </android.support.v7.widget.CardView>

@@ -34,9 +34,13 @@ import rx.schedulers.Schedulers;
 
 public class DetailsFra extends Fragment {
     @SuppressLint("StaticFieldLeak")
-    public static ImageView detailPoster,favoritefra;
+    public static ImageView detailPoster, favoriteFra;
+    public static int favoriteId;
+    private TextView date, overview;
+    private RecyclerView detailTrailers, overViewRecyclerView;
     private ReviewAdapter reviewAdapter;
     private TrailerAdapter trailerAdapter;
+    private View view;
 
     public DetailsFra() {
     }
@@ -47,63 +51,75 @@ public class DetailsFra extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
-        View view= inflater.inflate(R.layout.activity_details_actv, container, false);
-        detailPoster=view.findViewById(R.id.detailPoster1);
-        RecyclerView detail_trailers = view.findViewById(R.id.detail_trailers);
+        view = inflater.inflate(R.layout.activity_details_actv, container, false);
+        detailPoster = view.findViewById(R.id.detailPoster1);
+        detailTrailers = view.findViewById(R.id.detail_trailers);
 
-        TextView date = view.findViewById(R.id.date);
-        favoritefra=view.findViewById(R.id.favorite);
-        TextView overview = view.findViewById(R.id.overview);
-        RecyclerView recyclerViewreview = view.findViewById(R.id.OvrecyclerView);
-        Bundle args = getArguments();
-        if (args!=null) {
-            //Toast.makeText(getActivity(), "" +args.getString("image"), Toast.LENGTH_SHORT).show();
-            Glide.with(getActivity()).load("http://image.tmdb.org/t/p/w185/" + args.getString("image")).into(detailPoster);
-            date.setText(""+args.getString("date"));
-            overview.setText(args.getString("overview"));
-            int id= args.getInt("id");
-            List<Review> reviewList = new ArrayList<>();
-            List<Trailer> trailerList = new ArrayList<>();
-            reviewAdapter=new ReviewAdapter(getActivity(), reviewList);
-            trailerAdapter=new TrailerAdapter(getActivity(), trailerList, args.getString("name"),args.getString("image"));
+        date = view.findViewById(R.id.date);
+        favoriteFra = view.findViewById(R.id.favorite);
+        overview = view.findViewById(R.id.overview);
+        overViewRecyclerView = view.findViewById(R.id.OvrecyclerView);
+        view.setVisibility(View.INVISIBLE);
 
-            detail_trailers.setLayoutManager(new LinearLayoutManager(getActivity()));
-            detail_trailers.setAdapter(trailerAdapter);
-
-            recyclerViewreview.setLayoutManager(new LinearLayoutManager(getActivity()));
-            recyclerViewreview.setAdapter(reviewAdapter);
-            isFavMovies(id);
-            loadReviews(String.valueOf(id));
-            load(String.valueOf(id));
+        Bundle bundle = this.getArguments();
+        if (bundle != null) {
+            setView(getArguments().getParcelable("Movie"));
         }
+
 
         return view;
     }
 
+    private void setView(Movie movie) {
+        if (movie != null) {
+            view.setVisibility(View.VISIBLE);
 
-    private void isFavMovies(int id){
+            //Toast.makeText(getActivity(), "" +args.getString("image"), Toast.LENGTH_SHORT).show();
+            Glide.with(getActivity()).load("http://image.tmdb.org/t/p/w185/" + movie.getPosterPath()).into(detailPoster);
+            date.setText(movie.getReleaseDate());
+            overview.setText(movie.getOverview());
+            int id = movie.getId();
+            List<Review> reviewList = new ArrayList<>();
+            List<Trailer> trailerList = new ArrayList<>();
+            reviewAdapter = new ReviewAdapter(getActivity(), reviewList);
+            trailerAdapter = new TrailerAdapter(getActivity(), trailerList, movie.getTitle(), movie.getPosterPath());
 
-        Movie movie =new Movie();
+            detailTrailers.setLayoutManager(new LinearLayoutManager(getActivity()));
+            detailTrailers.setAdapter(trailerAdapter);
+
+            overViewRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
+            overViewRecyclerView.setAdapter(reviewAdapter);
+            favoriteId = id;
+            isFavMovies(id);
+            loadReviews(String.valueOf(id));
+            load(String.valueOf(id));
+        }
+    }
+
+
+    private void isFavMovies(int id) {
+
+        Movie movie = new Movie();
         movie.setId(id);
-        MovieDataRepository movieDataRepository=new MovieDataRepository(new MovieDataStoreFactory(getActivity(),new CacheImpl(getActivity())));
+        MovieDataRepository movieDataRepository = new MovieDataRepository(new MovieDataStoreFactory(getActivity(), new CacheImpl(getActivity())));
 
-        if(movieDataRepository.isFoundFavMov(movie)){
+        if (movieDataRepository.isFoundFavMov(movie)) {
 
 //            favorite.setVisibility(View.VISIBLE);
-            favoritefra.setImageResource(R.drawable.favorite);
+            favoriteFra.setImageResource(R.drawable.favorite);
 
 
-        }
-        else {
+        } else {
 
 //            favorite.setVisibility(View.INVISIBLE);
-            favoritefra.setImageResource(R.drawable.un_favorite);
+            favoriteFra.setImageResource(R.drawable.un_favorite);
 
         }
     }
-    public void loadReviews(String id){
 
-        MovieDataRepository movieDataRepository=new MovieDataRepository(new MovieDataStoreFactory(getActivity(),new CacheImpl(getActivity())));
+    public void loadReviews(String id) {
+
+        MovieDataRepository movieDataRepository = new MovieDataRepository(new MovieDataStoreFactory(getActivity(), new CacheImpl(getActivity())));
         movieDataRepository.movieReviewsStore(id, String.valueOf(MoviesGrid.pageNum))
                 .subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Subscriber<ReviewList>() {
@@ -121,8 +137,9 @@ public class DetailsFra extends Fragment {
                     }
                 });
     }
-    public void load(String id){
-        MovieDataRepository movieDataRepository=new MovieDataRepository(new MovieDataStoreFactory(getActivity(),new CacheImpl(getActivity())));
+
+    public void load(String id) {
+        MovieDataRepository movieDataRepository = new MovieDataRepository(new MovieDataStoreFactory(getActivity(), new CacheImpl(getActivity())));
         movieDataRepository.movieTrailerStore(id, String.valueOf(MoviesGrid.pageNum))
                 .subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Subscriber<TrailerList>() {

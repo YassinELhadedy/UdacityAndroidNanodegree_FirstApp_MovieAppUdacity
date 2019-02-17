@@ -3,16 +3,13 @@ package com.nextbit.yassin.movieappudacity1.presenter.fragment;
 import android.annotation.SuppressLint;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
 import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
@@ -31,7 +28,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-
 import com.bumptech.glide.Glide;
 import com.github.florent37.glidepalette.GlidePalette;
 import com.nextbit.yassin.movieappudacity1.R;
@@ -42,7 +38,7 @@ import com.nextbit.yassin.movieappudacity1.infrastructure.cache.CacheImpl;
 import com.nextbit.yassin.movieappudacity1.infrastructure.cache.provider.MyFavMovContentProvider;
 import com.nextbit.yassin.movieappudacity1.infrastructure.repository.MovieDataRepository;
 import com.nextbit.yassin.movieappudacity1.infrastructure.repository.datasource.MovieDataStoreFactory;
-import com.nextbit.yassin.movieappudacity1.presenter.activity.DetailsMovieAct;
+import com.nextbit.yassin.movieappudacity1.presenter.NavigateTo;
 import com.nextbit.yassin.movieappudacity1.presenter.views.ScaleInAnimationAdapter;
 
 import java.util.ArrayList;
@@ -61,20 +57,29 @@ import static com.nextbit.yassin.movieappudacity1.domain.confiq.Constants.KEY_NA
 import static com.nextbit.yassin.movieappudacity1.domain.confiq.Constants.KEY_R_D2;
 import static com.nextbit.yassin.movieappudacity1.domain.confiq.Constants.KEY_TRA_ID2;
 import static com.nextbit.yassin.movieappudacity1.domain.confiq.Constants.KEY_V_C2;
-import static com.nextbit.yassin.movieappudacity1.presenter.fragment.DetailsFra.favoritefra;
+import static com.nextbit.yassin.movieappudacity1.presenter.fragment.DetailsFra.favoriteFra;
+import static com.nextbit.yassin.movieappudacity1.presenter.fragment.DetailsFra.favoriteId;
 
 
 public class MoviesGrid extends Fragment {
     private LinearLayoutManager manager;
     @SuppressLint("StaticFieldLeak")
-    public  static RecyclerView recyclerView;
+    public static RecyclerView recyclerView;
     private SwipeRefreshLayout mRefreshLayout;
     public MenuItem up, popular, topRated, favorite;
     public static int pageNum = 3;
     private Animation anim;
-    public  MoviesGridAdapter adapter;
+    public MoviesGridAdapter adapter;
     public static final String SORT_SATE = "state";
-    private  static int itemPos =0;
+    private static int itemPos = 0;
+
+    // second way to avoid loosely coupling
+    private NavigateTo navigateTo;
+
+
+    public void setNavigateTo(NavigateTo navigateTo) {
+        this.navigateTo = navigateTo;
+    }
 
     public MoviesGrid() {
     }
@@ -82,22 +87,22 @@ public class MoviesGrid extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-         if (savedInstanceState !=null){
-           itemPos = savedInstanceState.getInt("itempostion",0);
+        if (savedInstanceState != null) {
+            itemPos = savedInstanceState.getInt("itempostion", 0);
 
-         }
+        }
         // Inflate the layout for this fragment
         View v = inflater.inflate(R.layout.fragment_movies_grid, container, false);
         setHasOptionsMenu(true);
 
         anim = AnimationUtils.loadAnimation(getActivity(), android.R.anim.fade_in);
         anim.setDuration(200);
-        recyclerView =  v.findViewById(R.id.mainGrid);
-        mRefreshLayout =  v.findViewById(R.id.refreshLayout);
+        recyclerView = v.findViewById(R.id.mainGrid);
+        mRefreshLayout = v.findViewById(R.id.refreshLayout);
         mRefreshLayout.setColorSchemeColors(0xff6b4d9c);
         mRefreshLayout.setRefreshing(true);
 
-        if (savedInstanceState==null) {
+        if (savedInstanceState == null) {
             if (getFromSharedPref().equals("popular") || getFromSharedPref().equals("top_rated")) {
                 getMovies(getFromSharedPref());
 
@@ -105,72 +110,62 @@ public class MoviesGrid extends Fragment {
 
         }
 
+        if (isBortOrientation()) {
+            if (isTablet(getContext())) {
+                // tablet_bort
+                manager = new GridLayoutManager(getActivity(), 1);
 
 
+            } else {
+                //mob_bort
+                manager = new GridLayoutManager(getActivity(), 2);
 
 
-        if (isBortOrientation()){
-           if (isTablet(getContext())){
-               // tablet_bort
-              manager = new GridLayoutManager(getActivity(), 1);
+            }
+        } else {
+            if (isTablet(getContext())) {
+                // tablet_land
+                manager = new GridLayoutManager(getActivity(), 2);
 
 
-           }
-           else {
-               //mob_bort
-               manager = new GridLayoutManager(getActivity(), 2);
+            } else {
+                // mob_land
+                manager = new GridLayoutManager(getActivity(), 3);
 
 
-           }
-       }
-       else {
-           if (isTablet(getContext())){
-               // tablet_land
-               manager = new GridLayoutManager(getActivity(), 2);
+            }
+
+        }
+        mRefreshLayout.setOnRefreshListener(() -> {
+            mRefreshLayout.setRefreshing(true);
+            itemPos = 0;
+            String sortRefresh = getFromSharedPref();
+            switch (sortRefresh) {
+                case "popular":
+                    getMovies("popular");
+                    break;
+                case "top_rated":
+                    getMovies("top_rated");
+                    break;
+                default:
+                    mRefreshLayout.setRefreshing(false);
+                    break;
+            }
 
 
-
-           }
-           else {
-               // mob_land
-              manager = new GridLayoutManager(getActivity(), 3);
-
-
-           }
-
-       }
-       mRefreshLayout.setOnRefreshListener(() -> {
-           mRefreshLayout.setRefreshing(true);
-           itemPos= 0;
-           String sortRefresh = getFromSharedPref();
-           switch (sortRefresh) {
-               case "popular":
-                   getMovies("popular");
-                   break;
-               case "top_rated":
-                   getMovies("top_rated");
-                   break;
-               default:
-                   mRefreshLayout.setRefreshing(false);
-                   break;
-           }
-
-
-       });
+        });
 
         return v;
     }
 
     private void menuCheck() {
-        if (getFromSharedPref().equals("popular") ) {
+        if (getFromSharedPref().equals("popular")) {
             popular.setChecked(true);
 
-        }
-        else if ( getFromSharedPref().equals("top_rated")){
+        } else if (getFromSharedPref().equals("top_rated")) {
             topRated.setChecked(true);
 
-        }
-        else {
+        } else {
             favorite.setChecked(true);
 
         }
@@ -205,7 +200,7 @@ public class MoviesGrid extends Fragment {
                     return false;
                 } else {
                     popular.setChecked(true);
-                    itemPos =0;
+                    itemPos = 0;
                     getMovies("popular");
                     savedinSharedPref("popular");
                     adapter.notifyDataSetChanged();
@@ -217,7 +212,7 @@ public class MoviesGrid extends Fragment {
                     return false;
                 } else {
                     topRated.setChecked(true);
-                    itemPos =0;
+                    itemPos = 0;
                     if (adapter != null) {
                         getMovies("top_rated");
                         savedinSharedPref("top_rated");
@@ -231,9 +226,9 @@ public class MoviesGrid extends Fragment {
                     return false;
                 } else {
                     favorite.setChecked(true);
-                    itemPos =0;
+                    itemPos = 0;
                     savedinSharedPref("favChecked");
-                    Uri todoUri = Uri.parse(MyFavMovContentProvider.CONTENT_URI+"");
+                    Uri todoUri = Uri.parse(MyFavMovContentProvider.CONTENT_URI + "");
 
                     adapter.updateMovies(getFavMovies(todoUri).getmovies());
 
@@ -242,20 +237,24 @@ public class MoviesGrid extends Fragment {
         }
         return super.onOptionsItemSelected(item);
     }
+
     private boolean isBortOrientation() {
         int rotation = getResources().getConfiguration().orientation;
-        boolean value = true ;
+        boolean value = true;
 
 
         switch (rotation) {
-            case Configuration.ORIENTATION_PORTRAIT: value = true;
+            case Configuration.ORIENTATION_PORTRAIT:
+                value = true;
                 break;
-            case Configuration.ORIENTATION_LANDSCAPE: value =false;
+            case Configuration.ORIENTATION_LANDSCAPE:
+                value = false;
                 break;
         }
         return value;
     }
-    public  boolean isTablet(Context context) {
+
+    public boolean isTablet(Context context) {
         return (context.getResources().getConfiguration().screenLayout
                 & Configuration.SCREENLAYOUT_SIZE_MASK)
                 >= Configuration.SCREENLAYOUT_SIZE_LARGE;
@@ -263,7 +262,7 @@ public class MoviesGrid extends Fragment {
     }
 
     public class MoviesGridAdapter extends RecyclerView.Adapter<MoviesGridAdapter.PosterHolder> {
-        private   List<Movie> movies;
+        private List<Movie> movies;
         private Context context;
 
         MoviesGridAdapter(List<Movie> movies, Context context) {
@@ -288,7 +287,7 @@ public class MoviesGrid extends Fragment {
             holder.unFav.setVisibility(GONE);
             holder.fav.invalidate();
             holder.unFav.invalidate();
-            Movie movie=movies.get(position);
+            Movie movie = movies.get(position);
             String posterUrl = "http://image.tmdb.org/t/p/w185/" + movie.getPosterPath();
             if (getActivity() == null) {
                 Toast.makeText(context, "activity is null ", Toast.LENGTH_SHORT).show();
@@ -320,9 +319,11 @@ public class MoviesGrid extends Fragment {
             holder.posterYear.setText(year);
             if (position >= 14) {
                 up.setVisible(true);
-            } else {try {
-                up.setVisible(false);
-            }catch (Exception ignored){}
+            } else {
+                try {
+                    up.setVisible(false);
+                } catch (Exception ignored) {
+                }
 
             }
 
@@ -331,7 +332,8 @@ public class MoviesGrid extends Fragment {
                     recyclerView.smoothScrollToPosition(0);
                     return true;
                 });
-            }catch (Exception ignored){}
+            } catch (Exception ignored) {
+            }
 
 
             final ScaleAnimation animation = new ScaleAnimation(0f, 1f, 0f, 1f,
@@ -343,8 +345,8 @@ public class MoviesGrid extends Fragment {
                 holder.fav.setVisibility(GONE);
                 holder.unFav.startAnimation(animation);
                 holder.unFav.setVisibility(VISIBLE);
-                if (isTablet(context)) {
-                    favoritefra.setImageResource(R.drawable.favorite);
+                if (isTablet(context) && movie.getId() == favoriteId) {
+                    favoriteFra.setImageResource(R.drawable.favorite);
                 }
                 putFav(movie);
             });
@@ -353,10 +355,9 @@ public class MoviesGrid extends Fragment {
                 holder.unFav.setVisibility(GONE);
                 holder.fav.startAnimation(animation);
                 holder.fav.setVisibility(VISIBLE);
-                if (isTablet(context)){
-                    favoritefra.setImageResource(R.drawable.un_favorite);
+                if (isTablet(context) && movie.getId() == favoriteId) {
+                    favoriteFra.setImageResource(R.drawable.un_favorite);
                 }
-
 
 
                 deleteFav(movie);
@@ -371,7 +372,7 @@ public class MoviesGrid extends Fragment {
 
             });
 
-           boolean isExisted = isExistedMovie(Uri.parse(MyFavMovContentProvider.CONTENT_URI+""),movie.getId().toString());
+            boolean isExisted = isExistedMovie(Uri.parse(MyFavMovContentProvider.CONTENT_URI + ""), movie.getId().toString());
             if (isExisted) {
                 holder.unFav.setVisibility(VISIBLE);
                 holder.fav.setVisibility(GONE);
@@ -381,48 +382,43 @@ public class MoviesGrid extends Fragment {
             }
 
             holder.gridCard.setOnClickListener(v -> {
-                FragmentManager manager = ((AppCompatActivity)context).getSupportFragmentManager();
+//                FragmentManager manager = ((AppCompatActivity) context).getSupportFragmentManager();
                 //Toast.makeText(context, "click", Toast.LENGTH_SHORT).show();
 
-                if (isTablet(context)){
-                    DetailsFra detailsFra=new DetailsFra();
-                    Bundle args = new Bundle();
+                navigateTo.navigateTo(movie);
 
-                    args.putString("image",movie.getPosterPath());
-                    args.putString("name",movie.getTitle());
-                    args.putDouble("rate",movie.getVoteAverage());
-                    args.putInt("count",movie.getVoteCount());
-                    args.putString("overview",movie.getOverview());
-                    args.putString("poster",movie.getPosterPath());
-                    args.putString("date",date);
-
-                    args.putInt("id",movie.getId());
-
-
-
-
-                    detailsFra.setArguments(args);
-                    manager.beginTransaction()
-                            .replace(R.id.description_fragment, detailsFra).commit();
-                }
-                else {
-                    Intent data=new Intent(context,DetailsMovieAct.class);
-                    data.putExtra("poster", movie.getPosterPath());
-                    data.putExtra("backdrop", movie.getBackdropPath());
-                    data.putExtra("title", movie.getTitle());
-                    data.putExtra("overview", movie.getOverview());
-                    data.putExtra("date", year);
-                    data.putExtra("vote", movie.getVoteAverage());
-                    data.putExtra("id", movie.getId());
-                    data.putExtra("position", position);
-                    context.startActivity(data);
-
-
-
-                }
+//                if (isTablet(context)) {
+//                    DetailsFra detailsFra = new DetailsFra();
+//                    Bundle args = new Bundle();
+//
+//                    args.putString("image", movie.getPosterPath());
+//                    args.putString("name", movie.getTitle());
+//                    args.putDouble("rate", movie.getVoteAverage());
+//                    args.putInt("count", movie.getVoteCount());
+//                    args.putString("overview", movie.getOverview());
+//                    args.putString("poster", movie.getPosterPath());
+//                    args.putString("date", date);
+//
+//                    args.putInt("id", movie.getId());
+//
+//
+//                    detailsFra.setArguments(args);
+//                    manager.beginTransaction()
+//                            .replace(R.id.description_fragment, detailsFra).commit();
+//                } else {
+//                    Intent data = new Intent(context, DetailsMovieAct.class);
+//                    data.putExtra("poster", movie.getPosterPath());
+//                    data.putExtra("backdrop", movie.getBackdropPath());
+//                    data.putExtra("title", movie.getTitle());
+//                    data.putExtra("overview", movie.getOverview());
+//                    data.putExtra("date", year);
+//                    data.putExtra("vote", movie.getVoteAverage());
+//                    data.putExtra("id", movie.getId());
+//                    data.putExtra("position", position);
+//                    context.startActivity(data);
+//                }
 
             });
-
 
 
         }
@@ -450,7 +446,8 @@ public class MoviesGrid extends Fragment {
                 dummyView = itemView.findViewById(R.id.dummyView);
             }
         }
-        private void putFav(Movie movie){
+
+        private void putFav(Movie movie) {
 
 
             ContentValues values = new ContentValues();
@@ -460,7 +457,7 @@ public class MoviesGrid extends Fragment {
 
             values.put(Constants.KEY_MOV_RAT2, movie.getVoteAverage());
             values.put(Constants.KEY_V_C2, movie.getVoteCount());
-            values.put(KEY_TRA_ID2,movie.getId());
+            values.put(KEY_TRA_ID2, movie.getId());
             values.put(Constants.KEY_R_D2, movie.getReleaseDate());
 
 
@@ -468,38 +465,41 @@ public class MoviesGrid extends Fragment {
                     MyFavMovContentProvider.CONTENT_URI, values);
 
         }
-        private void deleteFav(Movie movie){
+
+        private void deleteFav(Movie movie) {
             Uri uri = Uri.parse(MyFavMovContentProvider.CONTENT_URI + "/"
-                    +movie.getTitle());
+                    + movie.getTitle());
             context.getContentResolver().delete(uri, null, null);
 
 
         }
 
-       boolean isExistedMovie(Uri uri,String movieId){
+        boolean isExistedMovie(Uri uri, String movieId) {
 
-           String[] projection =  {KEY_NAME2,
-                   KEY_MOV_IMAGE2, KEY_MOV_OV2,KEY_MOV_RAT2,KEY_V_C2,KEY_TRA_ID2,KEY_R_D2,
-           };
+            String[] projection = {KEY_NAME2,
+                    KEY_MOV_IMAGE2, KEY_MOV_OV2, KEY_MOV_RAT2, KEY_V_C2, KEY_TRA_ID2, KEY_R_D2,
+            };
 
-           @SuppressLint("Recycle") Cursor cursor = getActivity().getContentResolver().query(uri, projection, KEY_TRA_ID2 + " =?", new String[]{movieId},
-                   null);
-           return cursor != null && cursor.moveToFirst();
+            @SuppressLint("Recycle") Cursor cursor = getActivity().getContentResolver().query(uri, projection, KEY_TRA_ID2 + " =?", new String[]{movieId},
+                    null);
+            return cursor != null && cursor.moveToFirst();
 
-       }
+        }
+
         void updateMovies(List<Movie> items) {
             movies = items;
             notifyDataSetChanged();
         }
 
     }
+
     public static void setAdapter(MoviesGridAdapter adapter) {
         recyclerView.setAdapter(adapter);
     }
 
-    void  getMovies(String spec) {
+    void getMovies(String spec) {
 
-        MovieDataRepository movieDataRepository=new MovieDataRepository(new MovieDataStoreFactory(getActivity(),new CacheImpl(getActivity())));
+        MovieDataRepository movieDataRepository = new MovieDataRepository(new MovieDataStoreFactory(getActivity(), new CacheImpl(getActivity())));
         movieDataRepository.movieListTopRatedStore(spec, String.valueOf(pageNum))
                 .subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Subscriber<MoviesList>() {
@@ -510,11 +510,12 @@ public class MoviesGrid extends Fragment {
 
                     @Override
                     public void onError(Throwable e) {
-                      try {
-                          Toast.makeText(getActivity(), e.getMessage(), Toast.LENGTH_SHORT).show();
+                        try {
+                            Toast.makeText(getActivity(), e.getMessage(), Toast.LENGTH_SHORT).show();
 
-                          mRefreshLayout.setRefreshing(false);
-                      }catch (Exception ignored){}
+                            mRefreshLayout.setRefreshing(false);
+                        } catch (Exception ignored) {
+                        }
                     }
 
                     @Override
@@ -535,21 +536,21 @@ public class MoviesGrid extends Fragment {
 
     MoviesList getFavMovies(Uri uri) {
 
-         MoviesList moviesList;
-         List<Movie>favoritism;
+        MoviesList moviesList;
+        List<Movie> favoritism;
 
-        String[] projection =  {KEY_NAME2,
-                KEY_MOV_IMAGE2, KEY_MOV_OV2,KEY_MOV_RAT2,KEY_V_C2,KEY_TRA_ID2,KEY_R_D2,
+        String[] projection = {KEY_NAME2,
+                KEY_MOV_IMAGE2, KEY_MOV_OV2, KEY_MOV_RAT2, KEY_V_C2, KEY_TRA_ID2, KEY_R_D2,
         };
         Cursor cursor = getActivity().getContentResolver().query(uri, projection, null, null,
                 null);
-        moviesList=new MoviesList();
-        favoritism=new ArrayList<>();
+        moviesList = new MoviesList();
+        favoritism = new ArrayList<>();
         assert cursor != null;
         if (cursor.moveToFirst()) {
 
             do {
-                Log.i("first line in do","nn");
+                Log.i("first line in do", "nn");
 
                 Movie movie = new Movie();
                 movie.setTitle(cursor.getString(cursor.getColumnIndex(KEY_NAME2)));
@@ -560,7 +561,7 @@ public class MoviesGrid extends Fragment {
                 movie.setId(Integer.parseInt(cursor.getString(cursor.getColumnIndex(KEY_TRA_ID2))));
                 movie.setReleaseDate(cursor.getString(cursor.getColumnIndex(Constants.KEY_R_D2)));
                 favoritism.add(movie);
-                Log.i("last in do","ss");
+                Log.i("last in do", "ss");
 
             } while (cursor.moveToNext());
         }
@@ -572,6 +573,7 @@ public class MoviesGrid extends Fragment {
 
 
     }
+
     private ScaleInAnimationAdapter adapterAnim(MoviesGridAdapter adapter) {
         ScaleInAnimationAdapter alphaAdapter = new ScaleInAnimationAdapter(adapter);
         alphaAdapter.setDuration(200);
@@ -588,27 +590,27 @@ public class MoviesGrid extends Fragment {
 //        outState.putParcelable("recycleview",recylerViewState);
 
 
-        if (manager.findFirstCompletelyVisibleItemPosition()<0){
+        if (manager.findFirstCompletelyVisibleItemPosition() < 0) {
 
 
             outState.putInt("itempostion", manager.findFirstCompletelyVisibleItemPosition());
 
 
-        }
-        else {
+        } else {
             outState.putInt("itempostion", manager.findLastCompletelyVisibleItemPosition());
             outState.putInt("itempostion", manager.findLastVisibleItemPosition());
         }
         super.onSaveInstanceState(outState);
     }
 
-    private void savedinSharedPref(String sort){
+    private void savedinSharedPref(String sort) {
         SharedPreferences sharedPref = getActivity().getPreferences(Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putString(SORT_SATE, sort);
         editor.apply();
     }
-    private String getFromSharedPref(){
+
+    private String getFromSharedPref() {
         SharedPreferences sharedPref = getActivity().getPreferences(Context.MODE_PRIVATE);
         return sharedPref.getString(SORT_SATE, "popular");
 
